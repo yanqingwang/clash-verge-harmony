@@ -4,3 +4,4 @@ out/
 node_modules/
 release/*.hap
 release/*.app
+sign/
