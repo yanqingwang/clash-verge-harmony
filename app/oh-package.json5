@@ -1,0 +1,13 @@
+{
+  "modelVersion": "5.1.0",
+  "name": "clash-verge-harmony",
+  "version": "0.1.0",
+  "description": "Clash Verge Rev HarmonyOS (鸿蒙7 / API 26) port — ArkWeb shell host.",
+  "main": "",
+  "author": "",
+  "license": "GPL-3.0",
+  "dependencies": {},
+  "devDependencies": {
+    "@ohos/hypium": "1.0.6"
+  }
+}

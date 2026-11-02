@@ -1,0 +1,3 @@
+[target.aarch64-unknown-linux-ohos]
+linker = "/Users/ross/Documents/WK/code/clash-verge-harmony/scripts/ohos-aarch64-clang.sh"
+ar = "/Users/ross/Documents/WK/code/clash-verge-harmony/scripts/ohos-llvm-ar.sh"

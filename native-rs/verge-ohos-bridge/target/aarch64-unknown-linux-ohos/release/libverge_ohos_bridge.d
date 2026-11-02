@@ -1,0 +1,1 @@
+/Users/ross/Documents/WK/code/clash-verge-harmony/native-rs/verge-ohos-bridge/target/aarch64-unknown-linux-ohos/release/libverge_ohos_bridge.so: /Users/ross/Documents/WK/code/clash-verge-harmony/native-rs/verge-ohos-bridge/src/lib.rs
