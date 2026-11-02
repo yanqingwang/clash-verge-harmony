@@ -6,5 +6,4 @@
 /local.properties
 *.hap
 /entry/libs/
-
-app/.codegenie
+/.codegenie
