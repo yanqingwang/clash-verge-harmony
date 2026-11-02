@@ -7,7 +7,7 @@
 	},
 	"BuildOptions":{
 		"SELECT_BUILD_PRODUCT":"default",
-		"BUNDLE_NAME":"io.github.clashverge.harmony",
+		"BUNDLE_NAME":"clash.Verge.cn",
 		"BUILD_PATH":{
 			"OUTPUT_PATH":"/Users/ross/Documents/WK/code/clash-verge-harmony/app/build/outputs/default"
 		},

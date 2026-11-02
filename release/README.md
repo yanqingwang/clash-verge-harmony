@@ -1,12 +1,28 @@
 # Clash Verge Harmony · release/ 产物说明
 
-**版本：0.1.0**（versionCode 1000000）· bundleName `io.github.clashverge.harmony` · 构建日期 2026-11-02（release mode）
+**版本：0.1.0**（versionCode 1000000）· bundleName `io.github.clashverge.harmony` · 构建日期 2026-11-02
 
 | 文件 | 用途 | 说明 |
 |---|---|---|
-| `clash-verge-harmony-0.1.0-unsigned.hap` | 安装包（entry 模块） | **未签名**。真机/模拟器安装需先签名（见下） |
-| `clash-verge-harmony-0.1.0-unsigned.app` | 应用分发包（APP bundle） | 未签名；含 entry 模块，供上架/侧载流程使用 |
-| `SHA256SUMS.txt` | 校验和 | 两个产物的 sha256 |
+| `clash-verge-harmony-0.1.0-signed.hap` | **签名安装包** | debug profile（DevEco 自动签名），`hap-sign-tool verify-app` 验证通过，可直接 `hdc install` 到真机/模拟器 |
+| `clash-verge-harmony-0.1.0-signed.app` | 签名 APP 分发包 | 同上签名 |
+| `clash-verge-harmony-0.1.0-unsigned.hap/.app` | 未签名对照 | 早期产物，仅供对照 |
+| `SHA256SUMS.txt` | 校验和 | 全部四个产物 |
+
+## 签名信息
+
+- 签名配置：`app/build-profile.json5` signingConfigs `default`（DevEco 自动签名生成）
+- 材料：`~/.ohos/config/default_app_Xv_yy_X-…=.{cer,p12,p7b}`（keyAlias `debugKey`）
+- profile：debug，bundleName `io.github.clashverge.harmony`，有效期至 2027-12（`~/.ohos/config` 下 p7b）
+- 验证命令：`java -jar <SDK>/toolchains/lib/hap-sign-tool.jar verify-app -inFile <hap> -outCertChain /tmp/c.cer -outProfile /tmp/p.p7b` → `Verify success`
+
+## 安装
+
+```bash
+hdc install -r clash-verge-harmony-0.1.0-signed.hap
+```
+
+> 上架需要 release profile：到华为 AGC 申请（大陆网络 + 实名账号），替换 signingConfigs 中 profile/p12 即可，无需改代码。
 
 ## 产物内容
 
@@ -15,10 +31,4 @@
 - **NAPI**：`libentry.so`（dlopen 桥接，9 方法）
 - **VPN**：VpnExtensionAbility（P3，`tun.file-descriptor` 数据面）
 
-## 安装前置（重要）
-
-1. **签名**：未签名 HAP 无法直接安装。两种方式：
-   - DevEco Studio → Project Structure → Signing Configs → **Automatically generate signature**（需实名华为账号 + 大陆网络），自动为 `io.github.clashverge.harmony` 生成 debug profile 并签名。
-   - 或为正式分发注册 release profile（华为 AGC）。
-2. **设备**：模拟器（DevEco Device Manager）或真机（hdc）。运行后验证：UI 加载 → 订阅导入 → 核心起停 → VPN 开关。
-3. 命令行复现：`scripts/build-core.sh` + `scripts/build-web.sh` + `scripts/build-hap.sh`（详见仓库 README 与交接指南 `wk/notes/clash-verge-harmony-交接指南-2026-11-02.md`）。
+命令行复现：`scripts/build-core.sh` + `scripts/build-web.sh` + `scripts/build-hap.sh`（详见仓库 README 与交接指南 `wk/notes/clash-verge-harmony-交接指南-2026-11-02.md`）。
