@@ -1,0 +1,10 @@
+/Users/ross/Documents/WK/code/clash-verge-harmony/native-rs/verge-ohos-bridge/target/aarch64-unknown-linux-ohos/release/deps/icu_normalizer-8a2216c284dcb74f.d: /Users/ross/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.4.0/src/lib.rs /Users/ross/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.4.0/src/properties.rs /Users/ross/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.4.0/src/provider.rs /Users/ross/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.4.0/src/uts46.rs
+
+/Users/ross/Documents/WK/code/clash-verge-harmony/native-rs/verge-ohos-bridge/target/aarch64-unknown-linux-ohos/release/deps/libicu_normalizer-8a2216c284dcb74f.rlib: /Users/ross/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.4.0/src/lib.rs /Users/ross/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.4.0/src/properties.rs /Users/ross/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.4.0/src/provider.rs /Users/ross/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.4.0/src/uts46.rs
+
+/Users/ross/Documents/WK/code/clash-verge-harmony/native-rs/verge-ohos-bridge/target/aarch64-unknown-linux-ohos/release/deps/libicu_normalizer-8a2216c284dcb74f.rmeta: /Users/ross/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.4.0/src/lib.rs /Users/ross/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.4.0/src/properties.rs /Users/ross/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.4.0/src/provider.rs /Users/ross/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.4.0/src/uts46.rs
+
+/Users/ross/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.4.0/src/lib.rs:
+/Users/ross/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.4.0/src/properties.rs:
+/Users/ross/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.4.0/src/provider.rs:
+/Users/ross/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.4.0/src/uts46.rs:

@@ -7,11 +7,11 @@
         "material": {
           "certpath": "/Users/ross/Documents/WK/code/clash-verge-harmony/sign/app-signing.cer",
           "keyAlias": "debugKey",
-          "keyPassword": "0000001AC293EF29BDEABBA2CAC8B0069B9265C5F751816F71D23A5B602191201EA22D204F4855827633",
+          "keyPassword": "0000001B8987E05F9CEFD0D8C9520ED74FE3AF4F35098CF1A91906260C6BC528A615DBFAA53E458F8DEE81",
           "profile": "/Users/ross/Documents/WK/code/clash-verge-harmony/sign/app-signing.p7b",
           "signAlg": "SHA256withECDSA",
           "storeFile": "/Users/ross/Documents/WK/code/clash-verge-harmony/sign/app-signing.p12",
-          "storePassword": "0000001A8168F1D5BC454FA74DA7F6B5351977B21EC30A5FEB9F920DB9B306EB25FE0198747174821B08"
+          "storePassword": "0000001B0E495EAE5982E44BBF799BAE5907AF4B786369ABC07B1A97A8C20B3E3814C2B9E53E9D2833C2FA"
         }
       }
     ],

@@ -13,4 +13,6 @@ ureq = { version = "2", default-features = false, features = ["tls"] }
 
 [profile.release]
 opt-level = "s"
-strip = true
+# strip=true would remove the cdylib's dynamic exports (dlsym fails at
+# runtime); keep debuginfo stripping only.
+strip = "debuginfo"

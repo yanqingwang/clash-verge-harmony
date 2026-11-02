@@ -30,9 +30,30 @@ static fn_core_wait_ready g_core_wait_ready = nullptr;
 static fn_core_rest_get g_core_rest_get = nullptr;
 static fn_subscription_fetch g_subscription_fetch = nullptr;
 
+static bool bridge_ready() {
+  return g_ping && g_version && g_config_generate && g_core_start &&
+         g_core_stop && g_core_status && g_core_wait_ready &&
+         g_core_rest_get && g_subscription_fetch;
+}
+
 static bool ensure_bridge() {
-  if (g_bridge)
-    return true;
+  if (g_bridge && bridge_ready()) return true;
+  // Re-resolve from scratch on any previous partial/failed init (a missing
+  // symbol must NOT leave a half-initialized handle that later short-circuits
+  // into a NULL call).
+  if (g_bridge) {
+    dlclose(g_bridge);
+    g_bridge = nullptr;
+    g_ping = nullptr;
+    g_version = nullptr;
+    g_config_generate = nullptr;
+    g_core_start = nullptr;
+    g_core_stop = nullptr;
+    g_core_status = nullptr;
+    g_core_wait_ready = nullptr;
+    g_core_rest_get = nullptr;
+    g_subscription_fetch = nullptr;
+  }
   g_bridge = dlopen("libverge_ohos_bridge.so", RTLD_NOW | RTLD_GLOBAL);
   if (!g_bridge)
     return false;
@@ -46,9 +67,14 @@ static bool ensure_bridge() {
   g_core_rest_get = (fn_core_rest_get)dlsym(g_bridge, "verge_core_rest_get");
   g_subscription_fetch =
       (fn_subscription_fetch)dlsym(g_bridge, "verge_subscription_fetch");
-  return g_ping && g_version && g_config_generate && g_core_start &&
-         g_core_stop && g_core_status && g_core_wait_ready &&
-         g_core_rest_get && g_subscription_fetch;
+  if (!bridge_ready()) {
+    // A missing symbol: drop the handle so the next call retries cleanly
+    // instead of short-circuiting into a NULL function call.
+    dlclose(g_bridge);
+    g_bridge = nullptr;
+    return false;
+  }
+  return true;
 }
 
 static napi_value JsPing(napi_env env, napi_callback_info) {

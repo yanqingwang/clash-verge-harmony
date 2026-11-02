@@ -17,6 +17,18 @@ pub mod subscription;
 
 use std::ffi::{c_char, CStr};
 
+/// Liveness probe for the dlopen/dlsym chain (NAPI JsPing).
+#[no_mangle]
+pub extern "C" fn verge_ohos_ping() -> i32 {
+    42
+}
+
+/// Bridge version string (NAPI JsBridgeVersion).
+#[no_mangle]
+pub extern "C" fn verge_ohos_version() -> *const c_char {
+    b"0.1.0-p2\0".as_ptr() as *const c_char
+}
+
 fn str_in(p: *const c_char) -> Result<String, String> {
     if p.is_null() {
         return Err("null string arg".into());
