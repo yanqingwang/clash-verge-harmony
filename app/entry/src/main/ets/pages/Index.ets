@@ -1,8 +1,8 @@
 import { webview } from '@kit.ArkWeb'
+import bridge from 'libentry.so'
 
 /**
- * P0 shell: proves the ArkWeb host + JS-bridge direction that the Clash Verge
- * React UI will ride on. `ohosBridge` is the exact seam where the Tauri
+ * P0 shell + P1 bridge: ArkWeb host and the NAPI seam where the Tauri
  * `invoke/listen` shim lands in P2 (see
  * wk/AIReports/clash-verge-鸿蒙7移植可行性报告-2026-11-02.md, 方案 B).
  */
@@ -10,9 +10,27 @@ import { webview } from '@kit.ArkWeb'
 @Component
 struct Index {
   controller: webview.WebviewController = new webview.WebviewController()
+  @State bridgeInfo: string = 'checking bridge…'
+
+  aboutToAppear(): void {
+    try {
+      const v = bridge.bridgeVersion()
+      const p = bridge.ping()
+      const st = bridge.coreStatus()
+      this.bridgeInfo = `bridge=${v} ping=${p} coreStatus=${st}`
+    } catch (e) {
+      this.bridgeInfo = `bridge error: ${JSON.stringify(e)}`
+    }
+  }
 
   build() {
     Column() {
+      Text(this.bridgeInfo)
+        .fontSize(12)
+        .fontColor('#3fb950')
+        .padding(4)
+        .width('100%')
+        .backgroundColor('#161b22')
       Web({ src: $rawfile('index.html'), controller: this.controller })
         .javaScriptProxy({
           object: {

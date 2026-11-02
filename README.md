@@ -11,6 +11,15 @@ Clash Verge Rev (v2.5.8) → HarmonyOS 7（鸿蒙7 / API 26 / "26.0.0"）移植�
 | ② Rust cdylib | ✅ | `native-rs/verge-ohos-bridge` → `libverge_ohos_bridge.so`：aarch64，仅 `NEEDED libc.so`（OHOS musl），导出 `verge_ohos_ping/verge_ohos_version` C ABI（NAPI 可直接调用）。rustc 1.99.1 `aarch64-unknown-linux-ohos`（官方 Tier 2）+ NDK clang 15.0.4 wrapper |
 | ③ ArkWeb 壳 HAP | ✅ | `app/`（bundleName `io.github.clashverge.harmony`，runtimeOS HarmonyOS，compatible/targetSdk "26.0.0"）→ hvigorw 6.26.8 构建成功 → `entry-default-unsigned.hap`（含 ArkTS 字节码 + ArkWeb 测试页 + ohosBridge JS 桥） |
 
+## P1 结果（2026-11-02）
+
+| 项 | 结果 | 证据 |
+|---|---|---|
+| 后端逻辑移植（Rust） | ✅ | `native-rs/verge-ohos-bridge/src/{config,core,subscription}.rs`：配置生成（镜像 `src-tauri/src/config/clash.rs` 语义：模板填充 + profile 覆盖 + secret 兜底）、核心 sidecar 管理（spawn `-d/-f`、REST `/version` 健康检查、stop）、订阅拉取（rustls，无 OpenSSL） |
+| 宿主机端到端 | ✅ | 补丁工具链同源构建 darwin mihomo → 集成测试 `core_lifecycle_end_to_end`：生成配置 → spawn → `/version` → 带鉴权 `GET /proxies` → stop → status 归零（0.78s，6 测试全绿） |
+| OHOS 交叉编译 | ✅ | 7 个 C ABI 符号导出、仅依赖 `libc.so`；`ring` 需要 `CC_aarch64_unknown_linux_ohos`（已写入 `.cargo/config.toml [env]`） |
+| HAP 集成 | ✅ | `libverge_mihomo.so`（核心可执行）+ `libverge_ohos_bridge.so` 打入 `libs/{arm64,arm64-v8a}`；NAPI 模块 `libentry.so` dlopen 桥接（9 个方法）；`Index.ets` 实时显示 bridge 状态。HAP 114MB |
+
 **尚未验证（需设备/模拟器或签名 profile）**：HAP 安装与 ohosBridge 页面在真机/模拟器上运行；mihomo 在 OHOS 运行时的 syscall 行为；VpnExtensionAbility TUN 数据面。
 
 ## 构建

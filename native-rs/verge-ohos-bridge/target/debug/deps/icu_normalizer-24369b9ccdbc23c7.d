@@ -1,0 +1,10 @@
+/Users/ross/Documents/WK/code/clash-verge-harmony/native-rs/verge-ohos-bridge/target/debug/deps/icu_normalizer-24369b9ccdbc23c7.d: /Users/ross/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.4.0/src/lib.rs /Users/ross/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.4.0/src/properties.rs /Users/ross/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.4.0/src/provider.rs /Users/ross/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.4.0/src/uts46.rs
+
+/Users/ross/Documents/WK/code/clash-verge-harmony/native-rs/verge-ohos-bridge/target/debug/deps/libicu_normalizer-24369b9ccdbc23c7.rlib: /Users/ross/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.4.0/src/lib.rs /Users/ross/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.4.0/src/properties.rs /Users/ross/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.4.0/src/provider.rs /Users/ross/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.4.0/src/uts46.rs
+
+/Users/ross/Documents/WK/code/clash-verge-harmony/native-rs/verge-ohos-bridge/target/debug/deps/libicu_normalizer-24369b9ccdbc23c7.rmeta: /Users/ross/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.4.0/src/lib.rs /Users/ross/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.4.0/src/properties.rs /Users/ross/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.4.0/src/provider.rs /Users/ross/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.4.0/src/uts46.rs
+
+/Users/ross/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.4.0/src/lib.rs:
+/Users/ross/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.4.0/src/properties.rs:
+/Users/ross/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.4.0/src/provider.rs:
+/Users/ross/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-2.4.0/src/uts46.rs:

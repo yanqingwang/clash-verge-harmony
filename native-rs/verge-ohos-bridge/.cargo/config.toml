@@ -1,3 +1,8 @@
 [target.aarch64-unknown-linux-ohos]
 linker = "/Users/ross/Documents/WK/code/clash-verge-harmony/scripts/ohos-aarch64-clang.sh"
-ar = "/Users/ross/Documents/WK/code/clash-verge-harmony/scripts/ohos-llvm-ar.sh"
+ar = "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/native/llvm/bin/llvm-ar"
+
+# cc crate (ring/rustls build scripts) needs the target C compiler too.
+[env]
+CC_aarch64_unknown_linux_ohos = "/Users/ross/Documents/WK/code/clash-verge-harmony/scripts/ohos-aarch64-clang.sh"
+AR_aarch64_unknown_linux_ohos = "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/native/llvm/bin/llvm-ar"

@@ -1,0 +1,9 @@
+export const ping: () => number
+export const bridgeVersion: () => string
+export const configGenerate: (profilePath: string, runtimePath: string) => number
+export const coreStart: (binaryPath: string, dataDir: string, runtimeConfigPath: string) => number
+export const coreStop: () => number
+export const coreStatus: () => number
+export const coreWaitReady: (timeoutMs: number) => number
+export const coreRestGet: (path: string) => string
+export const subscriptionFetch: (url: string, outPath: string) => number
