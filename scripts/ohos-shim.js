@@ -70,29 +70,40 @@
     // --- everything else: forward to ArkTS dispatcher ---
     return new Promise((resolve, reject) => {
       const id = 'r' + ++seq
-      pending.set(id, { resolve, reject })
+      const slow = cmd === 'import_profile' || cmd === 'update_profile'
+      const timer = setTimeout(() => {
+        if (pending.has(id)) {
+          pending.delete(id)
+          reject(new Error('ohos bridge timeout: ' + cmd))
+        }
+      }, slow ? 120000 : 20000)
+      pending.set(id, {
+        resolve: (v) => { clearTimeout(timer); resolve(v) },
+        reject: (e) => { clearTimeout(timer); reject(e) },
+      })
       try {
         window.ohosBridge.dispatch(id, cmd, JSON.stringify(args ?? {}))
       } catch (e) {
+        clearTimeout(timer)
         pending.delete(id)
         reject(e)
       }
     })
   }
 
-  window.__ohosResolve = function (id, ok, payloadJson) {
+  window.__ohosResolve = function (id, ok, payload) {
     const p = pending.get(id)
     if (!p) return
     pending.delete(id)
     if (ok === true || ok === 'true' || ok === 1 || ok === '1') {
-      p.resolve(payloadJson === undefined || payloadJson === null ? null : JSON.parse(payloadJson))
+      p.resolve(payload === undefined ? null : payload)
     } else {
-      p.reject(new Error(payloadJson == null ? 'command failed' : String(payloadJson)))
+      p.reject(new Error(typeof payload === 'string' ? payload : JSON.stringify(payload)))
     }
   }
 
-  window.__ohosEmit = function (event, payloadJson) {
-    emitLocal(event, payloadJson === undefined || payloadJson === null ? null : JSON.parse(payloadJson))
+  window.__ohosEmit = function (event, payload) {
+    emitLocal(event, payload)
   }
 
   window.__TAURI_INTERNALS__ = {
@@ -122,4 +133,5 @@
   window.__ohosBridgeVersion = function () {
     return window.ohosBridge.bridgeVersion()
   }
+
 })()

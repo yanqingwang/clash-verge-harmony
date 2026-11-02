@@ -158,11 +158,12 @@ export class VergeBridge {
     this.profilesStorePath = `${this.filesDir}/profiles.json`
     this.vergeConfigPath = `${this.filesDir}/verge.json`
     this.vpnStatusPath = `${this.filesDir}/${VPN_STATUS_FILE}`
-    try {
-      fs.mkdirSync(this.coreDir, true)
-      fs.mkdirSync(this.profilesDir, true)
-    } catch (e) {
-      hilog.warn(DOMAIN, TAG, 'mkdir dirs failed: %{public}s', JSON.stringify(e))
+    for (const dir of [this.coreDir, this.profilesDir]) {
+      try {
+        if (!fs.accessSync(dir)) fs.mkdirSync(dir, true)
+      } catch (e) {
+        hilog.warn(DOMAIN, TAG, 'mkdir %{public}s failed: %{public}s', dir, JSON.stringify(e))
+      }
     }
     this.coreBinPath = this.resolveCoreBinPath()
   }
@@ -185,6 +186,7 @@ export class VergeBridge {
   // ---------- transport ----------
 
   dispatch(id: string, cmd: string, argsJson: string): void {
+    hilog.debug(DOMAIN, TAG, 'cmd=%{public}s', cmd)
     let args: Record<string, Object> = {}
     if (argsJson.length > 0) {
       try {
