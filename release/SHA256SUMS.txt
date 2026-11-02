@@ -1,4 +1,4 @@
-6f1622c7649ef688547048466bbf5b88b83ebebafc02b5d71f77063b80e8f634  clash-verge-harmony-0.1.0-signed.hap
+84b65ff38d9a419cbb284ff49492996692f19cb0959873ab2a4a08f2f4612585  clash-verge-harmony-0.1.0-signed.hap
 eeab0a3b4ddf03337110213253a33054adc97d3fdcbd80e312ef5239f270768f  clash-verge-harmony-0.1.0-unsigned.hap
 592bda85510ee7100cd3ce726427abb501d7fda39cf755a25309a27672379a7c  clash-verge-harmony-0.1.0-signed.app
 24847506b49dc2c073c7a7ee37c4258f028c1c8d3d57f06edbb806dca59e8b7f  clash-verge-harmony-0.1.0-unsigned.app
