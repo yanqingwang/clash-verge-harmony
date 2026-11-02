@@ -26,11 +26,19 @@ Clash Verge Rev (v2.5.8) → HarmonyOS 7（鸿蒙7 / API 26 / "26.0.0"）移植�
 
 ```bash
 scripts/build-core.sh            # mihomo → out/verge-mihomo-ohos-arm64
-scripts/build-hap.sh             # app/ → entry-default-unsigned.hap
+scripts/build-hap.sh             # staging + app/ → entry-default-unsigned.hap
 ```
 
+### 用 DevEco Studio 打开（推荐日常路径）
+
+1. DevEco Studio → **Open** → 选择 `code/clash-verge-harmony/app`（注意：是 `app` 子目录，不是仓库根）。
+2. 首次打开若提示生成 hvigor wrapper / sync，确认即可（本地已缓存 hvigor 6.26.8 与 ohpm 依赖，离线可用）。
+3. `Build → Build Hap(s)/APP(s) → Build Hap(s)` 即可复现 CLI 同款产物；native 库由 `scripts/build-hap.sh` 同源的 staging 步骤保证（改 Rust 后先跑一次该脚本再回 IDE，或 IDE 内直接 Build——libs 已在 `entry/libs/` 就位）。
+4. 自动签名：**File → Project Structure → Signing Configs → 勾选 Automatically generate signature**（需已实名华为账号；签名服务器要求大陆网络）。签名成功后 `Run` 直接推到模拟器/真机。
+5. 运行验证点：首屏顶部绿色状态条显示 `bridge=… ping=42 coreStatus=…`；下方 ArkWeb 测试页显示 `ohosBridge.ping()` 结果。
+
 前置：DevEco Studio 26.0.0.851（含 SDK API 26 / NDK / hvigor 6.26.8 / JBR）。
-签名：需为 `io.github.clashverge.harmony` 注册调试 profile（华为签名服务器要求大陆 IP）；本机 `~/.ohos/config` 现有 profile 绑定的是 `com.heartroad.cardcounter`，不可复用。
+签名：需为 `io.github.clashverge.harmony` 注册调试 profile（华为签名服务器要求大陆网络）；本机 `~/.ohos/config` 现有 profile 绑定的是 `com.heartroad.cardcounter`，不可复用。
 
 ## 工程结构
 
