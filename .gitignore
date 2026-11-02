@@ -2,3 +2,5 @@ toolchain/
 core/
 out/
 node_modules/
+release/*.hap
+release/*.app

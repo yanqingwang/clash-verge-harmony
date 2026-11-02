@@ -1,0 +1,2 @@
+eeab0a3b4ddf03337110213253a33054adc97d3fdcbd80e312ef5239f270768f  clash-verge-harmony-0.1.0-unsigned.hap
+24847506b49dc2c073c7a7ee37c4258f028c1c8d3d57f06edbb806dca59e8b7f  clash-verge-harmony-0.1.0-unsigned.app
