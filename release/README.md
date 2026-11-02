@@ -12,8 +12,9 @@
 ## 签名信息
 
 - 签名配置：`app/build-profile.json5` signingConfigs `default`（DevEco 自动签名生成）
-- 材料：`~/.ohos/config/default_app_Xv_yy_X-…=.{cer,p12,p7b}`（keyAlias `debugKey`）
-- profile：debug，bundleName `io.github.clashverge.harmony`，有效期至 2027-12（`~/.ohos/config` 下 p7b）
+- 材料：`sign/app-signing.{cer,p12,p7b}`（keyAlias `debugKey`；`sign/` 已 gitignore，勿提交）
+- profile：debug，bundleName `io.github.clashverge.harmony`（`sign/app-signing.p7b`）
+- **`sign/material` 必须存在**：hvigor 的 `DecipherUtil` 用它解密 build-profile 里的密码。来源 = 账号级 `~/.ohos/config/material`（跨项目共用）。误删会导致 `SignHap` 报 "Signature material verification failed"，恢复方法：`cp -R ~/.ohos/config/material sign/material`
 - 验证命令：`java -jar <SDK>/toolchains/lib/hap-sign-tool.jar verify-app -inFile <hap> -outCertChain /tmp/c.cer -outProfile /tmp/p.p7b` → `Verify success`
 
 ## 安装
