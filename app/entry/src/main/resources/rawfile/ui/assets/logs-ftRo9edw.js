@@ -1,0 +1,1 @@
+var e={title:`Logs`},t={showDescending:`Mais recentes primeiro`,showAscending:`Mais antigos primeiro`},n={page:e,actions:t};export{t as actions,n as default,e as page};

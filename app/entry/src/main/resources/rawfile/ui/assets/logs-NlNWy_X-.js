@@ -1,0 +1,1 @@
+var e={title:`Protokolle`},t={showDescending:`Neueste zuerst`,showAscending:`Älteste zuerst`},n={page:e,actions:t};export{t as actions,n as default,e as page};

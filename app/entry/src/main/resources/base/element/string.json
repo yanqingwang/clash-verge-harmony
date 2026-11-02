@@ -3,6 +3,7 @@
     { "name": "module_desc", "value": "Clash Verge Rev HarmonyOS shell" },
     { "name": "EntryAbility_desc", "value": "Clash Verge main ability" },
     { "name": "EntryAbility_label", "value": "Clash Verge" },
-    { "name": "internet_permission_reason", "value": "Clash core needs network access to run the local proxy." }
+    { "name": "internet_permission_reason", "value": "Clash core needs network access to run the local proxy." },
+    { "name": "network_info_permission_reason", "value": "Reading network info is required to manage the VPN connection." }
   ]
 }

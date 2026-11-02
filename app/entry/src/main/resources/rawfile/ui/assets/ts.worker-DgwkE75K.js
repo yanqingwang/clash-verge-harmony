@@ -1,0 +1,1 @@
+function e(e){return new Worker(`/assets/ts.worker-AG_zREvT.js`,{name:e?.name})}export{e as default};

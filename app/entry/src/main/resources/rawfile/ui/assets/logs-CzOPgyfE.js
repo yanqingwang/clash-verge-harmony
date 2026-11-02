@@ -1,0 +1,1 @@
+var e={title:`Логи`},t={showDescending:`Сначала новые`,showAscending:`Сначала старые`},n={page:e,actions:t};export{t as actions,n as default,e as page};

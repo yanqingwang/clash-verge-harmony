@@ -34,10 +34,25 @@
         ]
       }
     ],
+    "extensionAbilities": [
+      {
+        "name": "VergeVpnAbility",
+        "srcEntry": "./ets/vpn/VergeVpnAbility.ets",
+        "type": "vpn",
+        "exported": false
+      }
+    ],
     "requestPermissions": [
       {
         "name": "ohos.permission.INTERNET",
         "reason": "$string:internet_permission_reason",
+        "usedScene": {
+          "when": "always"
+        }
+      },
+      {
+        "name": "ohos.permission.GET_NETWORK_INFO",
+        "reason": "$string:network_info_permission_reason",
         "usedScene": {
           "when": "always"
         }

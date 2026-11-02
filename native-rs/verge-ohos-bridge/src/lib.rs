@@ -43,6 +43,7 @@ pub extern "C" fn verge_config_generate(
     match (|| {
         let p = str_in(profile_path)?;
         let r = str_in(runtime_path)?;
+        core::remember_runtime_config(&r);
         config::generate_to_file(&p, &r)
     })() {
         Ok(()) => 0,

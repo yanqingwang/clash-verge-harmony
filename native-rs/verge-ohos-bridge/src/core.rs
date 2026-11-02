@@ -22,6 +22,32 @@ pub struct CoreStart<'a> {
     pub runtime_config_path: &'a str,
 }
 
+/// Last runtime config written/generated, so `rest_get` can reach a core
+/// spawned in a *different* process (e.g. the VPN extension) via its
+/// external-controller address without a local CoreHandle.
+static RUNTIME_CONFIG_PATH: Mutex<Option<String>> = Mutex::new(None);
+
+pub fn remember_runtime_config(path: &str) {
+    if let Ok(mut g) = RUNTIME_CONFIG_PATH.lock() {
+        *g = Some(path.to_owned());
+    }
+}
+
+fn rest_by_runtime_config(path: &str) -> Result<String, String> {
+    let cfg_path = {
+        let g = RUNTIME_CONFIG_PATH.lock().map_err(|e| e.to_string())?;
+        g.clone().ok_or("core not started")?
+    };
+    let yaml = std::fs::read_to_string(&cfg_path)
+        .map_err(|e| format!("read runtime config: {e}"))?;
+    let map: Mapping = serde_yaml::from_str(&yaml)
+        .map_err(|e| format!("parse runtime config: {e}"))?;
+    let controller = super::config::external_controller(&map)
+        .ok_or("runtime config has no external-controller")?;
+    let secret = super::config::secret(&map).unwrap_or_default();
+    get_json(&format!("http://{controller}"), &secret, path)
+}
+
 /// Spawn mihomo as a sidecar. Fails if one is already running.
 pub fn start(spec: CoreStart) -> Result<u32, String> {
     let mut guard = CORE.lock().map_err(|e| e.to_string())?;
@@ -29,6 +55,7 @@ pub fn start(spec: CoreStart) -> Result<u32, String> {
         return Err("core already running".into());
     }
 
+    remember_runtime_config(spec.runtime_config_path);
     let yaml = std::fs::read_to_string(spec.runtime_config_path)
         .map_err(|e| format!("read runtime config: {e}"))?;
     let map: Mapping = serde_yaml::from_str(&yaml)
@@ -126,12 +153,16 @@ pub fn wait_ready(timeout_ms: u64) -> Result<String, String> {
 }
 
 /// GET an arbitrary core REST path with auth (e.g. `/proxies`, `/configs`).
+/// Falls back to the external-controller address from the last runtime config
+/// when no core was spawned in *this* process (VPN extension owns the core).
 pub fn rest_get(path: &str) -> Result<String, String> {
-    let guard = CORE.lock().map_err(|e| e.to_string())?;
-    match guard.as_ref() {
-        None => Err("core not started".into()),
-        Some(h) => get_json(&h.controller, &h.secret, path),
+    {
+        let guard = CORE.lock().map_err(|e| e.to_string())?;
+        if let Some(h) = guard.as_ref() {
+            return get_json(&h.controller, &h.secret, path);
+        }
     }
+    rest_by_runtime_config(path)
 }
 
 #[cfg(test)]

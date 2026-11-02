@@ -1,0 +1,1 @@
+var e={title:`日志`},t={showDescending:`按时间倒序`,showAscending:`按时间正序`},n={page:e,actions:t};export{t as actions,n as default,e as page};

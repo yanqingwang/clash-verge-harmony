@@ -1,0 +1,1 @@
+function e(e){return new Worker(`/assets/editor.worker-BLJF_oQx.js`,{name:e?.name})}export{e as default};

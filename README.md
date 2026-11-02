@@ -20,12 +20,24 @@ Clash Verge Rev (v2.5.8) → HarmonyOS 7（鸿蒙7 / API 26 / "26.0.0"）移植�
 | OHOS 交叉编译 | ✅ | 7 个 C ABI 符号导出、仅依赖 `libc.so`；`ring` 需要 `CC_aarch64_unknown_linux_ohos`（已写入 `.cargo/config.toml [env]`） |
 | HAP 集成 | ✅ | `libverge_mihomo.so`（核心可执行）+ `libverge_ohos_bridge.so` 打入 `libs/{arm64,arm64-v8a}`；NAPI 模块 `libentry.so` dlopen 桥接（9 个方法）；`Index.ets` 实时显示 bridge 状态。HAP 114MB |
 
+## P2+P3 结果（2026-11-02）
+
+| 项 | 结果 | 证据 |
+|---|---|---|
+| P2 前端进 ArkWeb | ✅ | Verge React 前端 `pnpm web:build`（dist 20MB）→ `rawfile/ui/`；index.html 注入 `ohos-shim.js`（Tauri v2 `__TAURI_INTERNALS__` + event 插件模拟）、相对路径、去 `crossorigin`（resource:// 下模块脚本 CORS） |
+| P2 IPC shim | ✅ | node 冒烟 PASS：invoke→dispatch→resolve 往返、`plugin:event|listen/emit/unlisten` 语义、错误路径、args JSON（`scripts/ohos-shim.js`） |
+| P2 ArkTS dispatcher | ✅ | `ets/bridge/verge-bridge.ets`：核心生命周期/RunState/配置生成、profile 存储（`filesDir`）、代理视图（REST `/proxies` → ProxyViewV1）、延迟测试、Verge 配置存储、VPN 开关；桌面专属命令容错 stub；UI 监督器自动重启核心 |
+| P3 VpnExtensionAbility | ✅ 编译+架构 | `ets/vpn/VergeVpnAbility.ets`：`VpnConnection.create()` → fd → runtime.yaml `tun.file-descriptor` → coreStart；`blockedApplications:[自身]` 旁路回环（核心子进程同 UID）；supervisor 自动恢复；状态文件 `verge-vpn-status.txt` |
+| P3 跨进程 REST | ✅ | Rust `rest_get` 回退：无本地 core 时从最后 runtime 配置读 external-controller+secret 直连——UI 进程可查 VPN 进程所辖核心（host 测试全绿） |
+| 待设备验证 | — | VPN 真机行为（vpndialog 授权、TUN 数据面、DNS）、HAP 安装运行、签名 profile |
+
 **尚未验证（需设备/模拟器或签名 profile）**：HAP 安装与 ohosBridge 页面在真机/模拟器上运行；mihomo 在 OHOS 运行时的 syscall 行为；VpnExtensionAbility TUN 数据面。
 
 ## 构建
 
 ```bash
 scripts/build-core.sh            # mihomo → out/verge-mihomo-ohos-arm64
+scripts/build-web.sh             # Verge 前端 → rawfile/ui/（需 code/clash-verge-rev）
 scripts/build-hap.sh             # staging + app/ → entry-default-unsigned.hap
 ```
 

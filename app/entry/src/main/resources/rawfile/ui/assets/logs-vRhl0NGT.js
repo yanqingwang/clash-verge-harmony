@@ -1,0 +1,1 @@
+var e={title:`ログ`},t={showDescending:`Newest first`,showAscending:`Oldest first`},n={page:e,actions:t};export{t as actions,n as default,e as page};

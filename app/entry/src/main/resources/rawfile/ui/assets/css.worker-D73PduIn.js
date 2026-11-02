@@ -1,0 +1,1 @@
+function e(e){return new Worker(`/assets/css.worker-9fKlqoM8.js`,{name:e?.name})}export{e as default};

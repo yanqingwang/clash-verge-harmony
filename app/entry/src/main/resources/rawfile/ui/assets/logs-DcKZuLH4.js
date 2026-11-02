@@ -1,0 +1,1 @@
+var e={title:`Günlükler`},t={showDescending:`Önce en yeni`,showAscending:`Önce en eski`},n={page:e,actions:t};export{t as actions,n as default,e as page};
