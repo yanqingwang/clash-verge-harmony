@@ -6,6 +6,7 @@
     "mainElement": "EntryAbility",
     "deviceTypes": [
       "default",
+      "phone",
       "tablet",
       "2in1"
     ],

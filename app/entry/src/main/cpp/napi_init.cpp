@@ -17,6 +17,7 @@ typedef int (*fn_core_status)(void);
 typedef int (*fn_core_wait_ready)(unsigned long long);
 typedef long long (*fn_core_rest_get)(const char *, char *, unsigned long);
 typedef long long (*fn_subscription_fetch)(const char *, const char *);
+typedef const char *(*fn_last_error)(void);
 }
 
 static void *g_bridge = nullptr;
@@ -29,11 +30,12 @@ static fn_core_status g_core_status = nullptr;
 static fn_core_wait_ready g_core_wait_ready = nullptr;
 static fn_core_rest_get g_core_rest_get = nullptr;
 static fn_subscription_fetch g_subscription_fetch = nullptr;
+static fn_last_error g_last_error = nullptr;
 
 static bool bridge_ready() {
   return g_ping && g_version && g_config_generate && g_core_start &&
          g_core_stop && g_core_status && g_core_wait_ready &&
-         g_core_rest_get && g_subscription_fetch;
+         g_core_rest_get && g_subscription_fetch && g_last_error;
 }
 
 static bool ensure_bridge() {
@@ -53,6 +55,7 @@ static bool ensure_bridge() {
     g_core_wait_ready = nullptr;
     g_core_rest_get = nullptr;
     g_subscription_fetch = nullptr;
+  g_last_error = nullptr;
   }
   g_bridge = dlopen("libverge_ohos_bridge.so", RTLD_NOW | RTLD_GLOBAL);
   if (!g_bridge)
@@ -67,6 +70,8 @@ static bool ensure_bridge() {
   g_core_rest_get = (fn_core_rest_get)dlsym(g_bridge, "verge_core_rest_get");
   g_subscription_fetch =
       (fn_subscription_fetch)dlsym(g_bridge, "verge_subscription_fetch");
+  g_last_error =
+      (fn_last_error)dlsym(g_bridge, "verge_last_error");
   if (!bridge_ready()) {
     // A missing symbol: drop the handle so the next call retries cleanly
     // instead of short-circuiting into a NULL function call.
@@ -197,6 +202,22 @@ static napi_value JsSubscriptionFetch(napi_env env, napi_callback_info info) {
   return out;
 }
 
+static napi_value JsLastError(napi_env env, napi_callback_info) {
+  // Distinguish a real operation error from "the bridge itself is missing".
+  // The old code collapsed both into "bridge not loadable", which hid the
+  // actual subscription failure from the UI.
+  napi_value out;
+  if (g_bridge && g_last_error) {
+    napi_create_string_utf8(env, g_last_error(), NAPI_AUTO_LENGTH, &out);
+    return out;
+  }
+  const char *dl = dlerror();
+  napi_create_string_utf8(env,
+                          dl ? dl : "bridge not loadable (dlopen/dlsym failed)",
+                          NAPI_AUTO_LENGTH, &out);
+  return out;
+}
+
 EXTERN_C_START
 static napi_value Init(napi_env env, napi_value exports) {
   napi_property_descriptor desc[] = {
@@ -217,6 +238,8 @@ static napi_value Init(napi_env env, napi_value exports) {
        napi_default, nullptr},
       {"subscriptionFetch", nullptr, JsSubscriptionFetch, nullptr, nullptr,
        nullptr, napi_default, nullptr},
+      {"lastError", nullptr, JsLastError, nullptr, nullptr, nullptr,
+       napi_default, nullptr},
   };
   napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
   return exports;

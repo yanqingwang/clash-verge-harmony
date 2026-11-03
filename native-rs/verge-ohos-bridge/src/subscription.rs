@@ -30,6 +30,9 @@ pub fn fetch(url: &str) -> Result<Vec<u8>, String> {
 /// Fetch a subscription and persist it as a profile file.
 pub fn fetch_to_file(url: &str, out_path: &str) -> Result<usize, String> {
     let body = fetch(url)?;
+    if let Some(parent) = std::path::Path::new(out_path).parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("mkdir {parent:?}: {e}"))?;
+    }
     std::fs::write(out_path, &body).map_err(|e| format!("write {out_path}: {e}"))?;
     Ok(body.len())
 }

@@ -21,6 +21,7 @@ import common from '@ohos.app.ability.common'
 import Want from '@ohos.app.ability.Want'
 import vpnExtension from '@ohos.net.vpnExtension'
 import { BusinessError } from '@kit.BasicServicesKit'
+import { fetchSubscriptionTo, SubscriptionFetchResult } from '../subscription/subscription-fetcher'
 
 const TAG = 'VergeBridge'
 const DOMAIN = 0x0666
@@ -28,6 +29,12 @@ const BUNDLE_NAME = 'io.github.clashverge.harmony'
 const VPN_ABILITY = 'VergeVpnAbility'
 const VPN_STATUS_FILE = 'verge-vpn-status.txt'
 const DEFAULT_MIXED_PORT = 7890
+
+/** Payload returned to the UI on a successful subscription download. */
+interface SubscriptionOkView {
+  bytes: number
+  source: string
+}
 
 // ---------- payload shapes (mirror src/types/proxy-view.ts + cmds.ts) ----------
 
@@ -185,6 +192,73 @@ export class VergeBridge {
 
   // ---------- transport ----------
 
+  /**
+   * Download a subscription, native netstack first, Rust/ureq fallback.
+   *
+   * Both `import_profile` and `update_profile` funnel through here so the
+   * network call never blocks the ArkTS main thread (the old synchronous
+   * `bridge.subscriptionFetch` did) and so every failure carries its real
+   * cause back to the UI instead of an opaque `rc=-1`.
+   */
+  private fetchSubscription(
+    id: string,
+    url: string,
+    outPath: string,
+    onSuccess: () => void
+  ): void {
+    fetchSubscriptionTo(url, outPath)
+      .then((res: SubscriptionFetchResult) => this.onSubscriptionFetched(id, url, outPath, res, onSuccess))
+      .catch((e: BusinessError) => {
+        // Should not happen (fetchSubscriptionTo never throws) but keep the
+        // promise contract honest: still fall back before giving up.
+        hilog.warn(DOMAIN, TAG, 'native fetch rejected for %{public}s: %{public}s', url, JSON.stringify(e))
+        this.rustFallbackFetch(id, url, outPath, `native path threw: ${JSON.stringify(e)}`, onSuccess)
+      })
+  }
+
+  private onSubscriptionFetched(
+    id: string,
+    url: string,
+    outPath: string,
+    res: SubscriptionFetchResult,
+    onSuccess: () => void
+  ): void {
+    if (res.error.length === 0) {
+      onSuccess()
+      const ok: SubscriptionOkView = { bytes: res.bytes, source: res.source }
+      this.resolve(id, true, ok)
+      return
+    }
+    // Native netstack failed (DNS / TLS / HTTP / body). Retry over the Rust
+    // ureq/rustls path before surfacing both errors, so a device with a working
+    // musl stack still succeeds.
+    this.rustFallbackFetch(id, url, outPath, res.error, onSuccess)
+  }
+
+  private rustFallbackFetch(
+    id: string,
+    url: string,
+    outPath: string,
+    nativeError: string,
+    onSuccess: () => void
+  ): void {
+    let rc = -1
+    let err = 'bridge unavailable'
+    try {
+      rc = bridge.subscriptionFetch(url, outPath)
+      if (rc <= 0) err = bridge.lastError()
+    } catch (e) {
+      err = JSON.stringify(e)
+    }
+    if (rc > 0) {
+      hilog.warn(DOMAIN, TAG, 'native fetch failed (%{public}s) but rustls fallback got %{public}d bytes', nativeError, rc)
+      onSuccess()
+      const ok: SubscriptionOkView = { bytes: rc, source: 'rustls' }
+      this.resolve(id, true, ok)
+      return
+    }
+    this.resolve(id, false, `subscription fetch failed: ${nativeError} | rustls fallback: ${err}`)
+  }
   dispatch(id: string, cmd: string, argsJson: string): void {
     hilog.debug(DOMAIN, TAG, 'cmd=%{public}s', cmd)
     let args: Record<string, Object> = {}
@@ -449,6 +523,54 @@ export class VergeBridge {
     }
   }
 
+  private baseConfigPayload(): Object {
+    const raw = this.restConfigs()
+    const map: Record<string, string> = {
+      'socks-port': 'socksPort',
+      'redir-port': 'redirPort',
+      'tproxy-port': 'tproxyPort',
+      'mixed-port': 'mixedPort',
+      'allow-lan': 'allowLan',
+      'bind-address': 'bindAddress',
+      'log-level': 'logLevel',
+      'unified-delay': 'unifiedDelay',
+      'interface-name': 'interfaceName',
+      'find-process-mode': 'findProcessMode',
+      'tcp-concurrent': 'tcpConcurrent',
+      'external-controller': 'externalController',
+      'external-controller-cors': 'externalControllerCors',
+    }
+    const out: Record<string, Object> = {}
+    for (const k of Object.keys(raw)) {
+      const nk = map[k] !== undefined ? map[k] : k
+      out[nk] = raw[k]
+    }
+    return out
+  }
+
+  /** mihomo GET /configs, or defaults when the core is not running. */
+  private restConfigs(): Record<string, Object> {
+    if (this.coreRunning() || this.vpnActive()) {
+      try {
+        const raw = JSON.parse(bridge.coreRestGet('/configs')) as Record<string, Object>
+        if (Object.keys(raw).length > 0) return raw
+      } catch (e) {
+        // fall through to defaults
+      }
+    }
+    const d: Record<string, Object> = {}
+    d['port'] = 0
+    d['socks-port'] = 0
+    d['redir-port'] = 0
+    d['tproxy-port'] = 0
+    d['mixed-port'] = DEFAULT_MIXED_PORT
+    d['allow-lan'] = false
+    d['mode'] = 'rule'
+    d['log-level'] = 'info'
+    d['ipv6'] = false
+    return d
+  }
+
   // ---------- command dispatch ----------
 
   private handle(id: string, cmd: string, args: Record<string, Object>): void {
@@ -513,23 +635,20 @@ export class VergeBridge {
         }
         const uid = util.generateRandomUUID(true)
         const outPath = this.profilePath(uid)
-        const rc = bridge.subscriptionFetch(url, outPath)
-        if (rc !== 0) {
-          this.resolve(id, false, `import_profile: fetch failed rc=${rc}`)
-          return
-        }
-        const store = this.readProfilesStore()
-        const item: ProfileItemView = {
-          uid,
-          type: 'remote',
-          name: this.urlName(url),
-          url,
-          updated: Math.floor(Date.now() / 1000),
-        }
-        this.items(store).push(item)
-        this.saveProfilesStore(store)
-        this.emit('verge://refresh-profiles', '')
-        this.resolve(id, true, null)
+        this.fetchSubscription(id, url, outPath, () => {
+          // Runs after a successful fetch: register the profile item.
+          const store = this.readProfilesStore()
+          const item: ProfileItemView = {
+            uid,
+            type: 'remote',
+            name: this.urlName(url),
+            url,
+            updated: Math.floor(Date.now() / 1000),
+          }
+          this.items(store).push(item)
+          this.saveProfilesStore(store)
+          this.emit('verge://refresh-profiles', '')
+        })
         return
       }
       case 'update_profile': {
@@ -539,15 +658,13 @@ export class VergeBridge {
           this.resolve(id, false, 'update_profile: profile not found')
           return
         }
-        const rc = bridge.subscriptionFetch(item['url'] as string, this.profilePath(uid))
-        if (rc !== 0) {
-          this.resolve(id, false, `update_profile: fetch failed rc=${rc}`)
-          return
-        }
-        item['updated'] = Math.floor(Date.now() / 1000)
-        this.saveProfilesStore(this.readProfilesStore())
-        this.emit('verge://refresh-profiles', '')
-        this.resolve(id, true, null)
+        const url = item['url'] as string
+        const outPath = this.profilePath(uid)
+        this.fetchSubscription(id, url, outPath, () => {
+          item['updated'] = Math.floor(Date.now() / 1000)
+          this.saveProfilesStore(this.readProfilesStore())
+          this.emit('verge://refresh-profiles', '')
+        })
         return
       }
       case 'delete_profile': {
@@ -677,6 +794,82 @@ export class VergeBridge {
         this.resolve(id, true, info)
         return
       }
+      case 'get_clash_info': {
+        const info: Record<string, Object> = {}
+        info['mixed_port'] = DEFAULT_MIXED_PORT
+        info['port'] = 0
+        info['socks_port'] = 0
+        info['redir_port'] = 0
+        info['tproxy_port'] = 0
+        info['server'] = '127.0.0.1:9090'
+        info['secret'] = ''
+        this.resolve(id, true, info)
+        return
+      }
+      case 'get_runtime_config':
+        this.resolve(id, true, this.restConfigs())
+        return
+      case 'get_runtime_yaml': {
+        const yaml = this.readTextFile(this.runtimeConfigPath)
+        this.resolve(id, true, yaml.length > 0 ? yaml : null)
+        return
+      }
+      case 'get_runtime_logs': {
+        const logs: Record<string, Object> = {}
+        this.resolve(id, true, logs)
+        return
+      }
+      case 'get_sys_proxy': {
+        const sp: Record<string, Object> = {}
+        sp['enable'] = false
+        sp['server'] = ''
+        sp['bypass'] = ''
+        this.resolve(id, true, sp)
+        return
+      }
+      case 'get_auto_proxy': {
+        const ap: Record<string, Object> = {}
+        ap['enable'] = false
+        ap['url'] = ''
+        this.resolve(id, true, ap)
+        return
+      }
+      case 'take_discarded_keys_notice':
+        this.resolve(id, true, null)
+        return
+      case 'plugin:mihomo|get_base_config':
+        this.resolve(id, true, this.baseConfigPayload())
+        return
+      case 'plugin:mihomo|get_rules':
+      case 'plugin:mihomo|get_rule_providers':
+      case 'plugin:mihomo|get_providers_proxies': {
+        const path = cmd === 'plugin:mihomo|get_rules'
+          ? '/rules'
+          : cmd === 'plugin:mihomo|get_rule_providers' ? '/providers/rules' : '/providers/proxies'
+        if (!this.coreRunning() && !this.vpnActive()) {
+          const emptyRules: Record<string, Object> = { 'rules': [] }
+          this.resolve(id, true, emptyRules)
+          return
+        }
+        try {
+          const body = JSON.parse(bridge.coreRestGet(path)) as Record<string, Object>
+          this.resolve(id, true, body)
+        } catch (e) {
+          this.resolve(id, false, `core rest ${path} failed`)
+        }
+        return
+      }
+      case 'plugin:mihomo|update_rule_provider':
+      case 'plugin:mihomo|clear_all_ws_connections':
+        this.resolve(id, true, null)
+        return
+      case 'plugin:mihomo|reload_config':
+        if (this.coreRunning()) this.restartCore()
+        this.resolve(id, true, null)
+        return
+      case 'get_pending_failures':
+        this.resolve(id, true, new Array<Object>())
+        return
       case 'get_sidecar_failure':
         this.resolve(id, true, null)
         return

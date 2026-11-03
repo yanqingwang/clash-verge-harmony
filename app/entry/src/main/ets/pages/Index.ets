@@ -23,6 +23,21 @@ struct Index {
   private vb: VergeBridge | null = null
   @State bridgeInfo: string = 'checking bridge…'
 
+  // Back key / edge swipe: navigate the hosted UI's history first (in-app back);
+  // only at its root return false, which lets EntryAbility.onBackPressed move
+  // the app to the background rather than closing it.
+  onBackPress(): boolean {
+    try {
+      if (this.controller.accessBackward()) {
+        this.controller.backward()
+        return true
+      }
+    } catch (e) {
+      hilog.warn(DOMAIN, 'Index', 'backward failed: %{public}s', JSON.stringify(e))
+    }
+    return false
+  }
+
   aboutToAppear(): void {
     try {
       const v = bridge.bridgeVersion()
@@ -66,6 +81,11 @@ struct Index {
     return resp
   }
 
+  private isBinary(path: string): boolean {
+    return path.endsWith('.png') || path.endsWith('.ico') || path.endsWith('.woff2') ||
+      path.endsWith('.ttf') || path.endsWith('.webp') || path.endsWith('.svg')
+  }
+
   private intercept(url: string): WebResourceResponse {
     const prefix = APPASSETS
     if (!url.startsWith(prefix)) return this.notFound()
@@ -80,7 +100,9 @@ struct Index {
       const resp = new WebResourceResponse()
       resp.setResponseData(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength))
       resp.setResponseMimeType(this.mimeOf(path))
-      resp.setResponseEncoding('utf-8')
+      if (!this.isBinary(path)) {
+        resp.setResponseEncoding('utf-8')
+      }
       resp.setResponseCode(200)
       resp.setReasonMessage('OK')
       resp.setResponseHeader([{ headerKey: 'Access-Control-Allow-Origin', headerValue: '*' }])
@@ -99,10 +121,13 @@ struct Index {
         .padding(4)
         .width('100%')
         .backgroundColor('#161b22')
-      Web({ src: APPASSETS + 'index.html', controller: this.controller })
+
+      Web({ src: APPASSETS, controller: this.controller })
         .layoutWeight(1)
         .width('100%')
         .javaScriptAccess(true)
+        .domStorageAccess(true)
+        .onlineImageAccess(true)
         .javaScriptProxy({
           object: {
             dispatch: (id: string, cmd: string, argsJson: string): void => {
@@ -126,8 +151,12 @@ struct Index {
           hilog.error(DOMAIN, 'WebErr', 'url=%{public}s code=%{public}s info=%{public}s',
             event.request.getRequestUrl(), event.error.getErrorCode(), event.error.getErrorInfo())
         })
-        .onlineImageAccess(true)
-        .domStorageAccess(true)
+        .onPageEnd((event) => {
+          hilog.info(DOMAIN, 'PageEnd', 'url=%{public}s', event.url)
+        })
+        .onPageBegin((event) => {
+          hilog.info(DOMAIN, 'PageBegin', 'url=%{public}s', event.url)
+        })
     }
     .width('100%')
     .height('100%')

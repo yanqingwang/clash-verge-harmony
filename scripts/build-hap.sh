@@ -19,7 +19,8 @@ mkdir -p entry/libs/arm64 entry/libs/arm64-v8a
 cp "$ROOT/out/verge-mihomo-ohos-arm64" entry/libs/arm64/libverge_mihomo.so
 cp "$ROOT/native-rs/verge-ohos-bridge/target/aarch64-unknown-linux-ohos/release/libverge_ohos_bridge.so" \
    entry/libs/arm64/libverge_ohos_bridge.so
-cp entry/libs/arm64/libverge_mihomo.so entry/libs/arm64/libverge_ohos_bridge.so entry/libs/arm64-v8a/
+cp entry/libs/arm64/libverge_mihomo.so entry/libs/arm64-v8a/
+cp entry/libs/arm64/libverge_ohos_bridge.so entry/libs/arm64-v8a/
 
 hvigorw --mode module -p product=default -p module=entry@default assembleHap --no-daemon "$@"
 

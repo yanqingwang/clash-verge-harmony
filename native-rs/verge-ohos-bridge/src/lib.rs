@@ -16,6 +16,15 @@ pub mod subscription;
 // ---------------------------------------------------------------------------
 
 use std::ffi::{c_char, CStr};
+use std::sync::Mutex;
+
+static LAST_ERROR: Mutex<String> = Mutex::new(String::new());
+
+fn set_last_error(msg: &str) {
+    if let Ok(mut g) = LAST_ERROR.lock() {
+        *g = msg.to_string();
+    }
+}
 
 /// Liveness probe for the dlopen/dlsym chain (NAPI JsPing).
 #[no_mangle]
@@ -146,6 +155,25 @@ pub unsafe extern "C" fn verge_subscription_fetch(
         subscription::fetch_to_file(&u, &p)
     })() {
         Ok(n) => n as i64,
-        Err(_) => -1,
+        Err(e) => {
+            set_last_error(&e);
+            -1
+        }
+    }
+}
+
+/// Return the last error message (NUL-terminated); empty string if none.
+#[no_mangle]
+pub extern "C" fn verge_last_error() -> *const c_char {
+    static EMPTY: [u8; 1] = [0];
+    match LAST_ERROR.lock() {
+        Ok(g) if !g.is_empty() => {
+            // Leak the string so the pointer stays valid until the next call.
+            let s = format!("{}\0", g);
+            let ptr = s.as_ptr() as *const c_char;
+            std::mem::forget(s);
+            ptr
+        }
+        _ => EMPTY.as_ptr() as *const c_char,
     }
 }
