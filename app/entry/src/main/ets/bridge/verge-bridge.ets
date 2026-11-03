@@ -151,8 +151,8 @@ export class VergeBridge {
   private profilesStorePath: string
   private vergeConfigPath: string
   private vpnStatusPath: string
-  private coreBinPath: string
   coreDesired: boolean = false
+  private coreEnsureRequested: boolean = false
   private uptimeStart: number = Date.now()
 
   constructor(controller: webview.WebviewController, context: common.UIAbilityContext) {
@@ -172,22 +172,6 @@ export class VergeBridge {
         hilog.warn(DOMAIN, TAG, 'mkdir %{public}s failed: %{public}s', dir, JSON.stringify(e))
       }
     }
-    this.coreBinPath = this.resolveCoreBinPath()
-  }
-
-  private resolveCoreBinPath(): string {
-    const candidates: string[] = [
-      `${this.bundleCodeDir}/libs/arm64/libverge_mihomo.so`,
-      `${this.bundleCodeDir}/libs/arm64-v8a/libverge_mihomo.so`,
-    ]
-    for (const p of candidates) {
-      try {
-        if (fs.accessSync(p)) return p
-      } catch (e) {
-        // keep probing
-      }
-    }
-    return candidates[0]
   }
 
   // ---------- transport ----------
@@ -374,7 +358,9 @@ export class VergeBridge {
 
   coreRunning(): boolean {
     try {
-      return bridge.coreStatus() > 0
+      // The core is a c-shared library loaded into this process (HarmonyOS
+      // forbids execve of app-owned files), so ask the loaded library.
+      return bridge.coreIsRunningEmbedded() > 0
     } catch (e) {
       return false
     }
@@ -395,7 +381,29 @@ export class VergeBridge {
     bridge.configGenerate(profile, this.runtimeConfigPath)
   }
 
+  /** Start the core when a profile is active; safe to call repeatedly. */
+  ensureCore(): void {
+    if (this.coreEnsureRequested) return
+    try {
+      const running = this.coreRunning()
+      const vpn = this.vpnActive()
+      const uid = this.currentProfileUid(this.readProfilesStore())
+      hilog.info(DOMAIN, TAG, 'ensureCore running=%{public}s vpn=%{public}s uid=%{public}s',
+        String(running), String(vpn), uid)
+      if (!running && !vpn && uid.length > 0) this.startCore()
+      this.coreEnsureRequested = true
+    } catch (e) {
+      // Leave the flag unset so the next get_profiles retries.
+      hilog.warn(DOMAIN, TAG, 'ensureCore failed: %{public}s', JSON.stringify(e))
+    }
+  }
+
   private startCore(): void {
+    // A restart or a repeated toggle must not spawn a second instance.
+    if (this.coreRunning()) {
+      this.coreDesired = true
+      return
+    }
     this.generateConfig()
     // If the VPN extension owns the core, do not spawn a second instance in
     // this process (the extension's supervisor restarts it); just regenerate
@@ -404,13 +412,15 @@ export class VergeBridge {
       this.coreDesired = false
       return
     }
-    const pid = bridge.coreStart(this.coreBinPath, this.coreDir, this.runtimeConfigPath)
-    this.coreDesired = pid > 0
+    const rc = bridge.coreStartEmbedded(this.runtimeConfigPath, this.coreDir)
+    hilog.info(DOMAIN, TAG, 'coreStartEmbedded cfg=%{public}s rc=%{public}d running=%{public}d',
+      this.runtimeConfigPath, rc, bridge.coreIsRunningEmbedded())
+    this.coreDesired = rc === 0
     this.emit('verge://run-state-changed', this.runStatePayload())
   }
 
   private stopCore(): void {
-    bridge.coreStop()
+    bridge.coreStopEmbedded()
     this.coreDesired = false
     this.emit('verge://run-state-changed', this.runStatePayload())
   }
@@ -451,18 +461,31 @@ export class VergeBridge {
     }
     if (!this.coreRunning() && !this.vpnActive()) return empty
     const raw = bridge.coreRestGet('/proxies')
+    if (raw.length === 0) {
+      hilog.warn(DOMAIN, TAG, 'proxyView REST empty: %{public}s', bridge.lastError())
+    }
     if (raw.length === 0) return empty
     try {
       const data = JSON.parse(raw) as Record<string, Object>
-      const rawGroups: Array<Object> = Array.isArray(data['groups'])
-        ? (data['groups'] as Array<Object>)
-        : new Array<Object>()
-      const rawProxies: Array<Object> = Array.isArray(data['proxies'])
-        ? (data['proxies'] as Array<Object>)
-        : new Array<Object>()
+      // mihomo GET /proxies returns {"proxies": {"<name>": {...}}}. Selector,
+      // url-test, fallback and load-balance entries carry "all"; those are the
+      // groups. Group members may themselves be groups, so every member must
+      // resolve either as a node record or as a group reference — the UI throws
+      // "Proxy view record not found" otherwise.
+      const proxMap = data['proxies']
+      const entries: Array<Object> = new Array<Object>()
+      if (proxMap !== undefined && proxMap !== null && typeof proxMap === 'object') {
+        const m = proxMap as Record<string, Object>
+        for (const key of Object.keys(m)) entries.push(m[key] as Object)
+      }
+      const groupNames: Record<string, boolean> = {}
+      for (const e of entries) {
+        const o = e as Record<string, Object>
+        if (Array.isArray(o['all'])) groupNames[o['name'] as string] = true
+      }
       const records: Record<string, Object> = {}
-      for (const p of rawProxies) {
-        const o = p as Record<string, Object>
+      for (const e of entries) {
+        const o = e as Record<string, Object>
         const name = o['name'] as string
         const history: Array<Object> = Array.isArray(o['history']) ? (o['history'] as Array<Object>) : new Array<Object>()
         const src: NodeSourceView = { kind: 'core', proxyName: name }
@@ -470,7 +493,7 @@ export class VergeBridge {
           recordId: name,
           name,
           type: o['type'] !== undefined ? (o['type'] as string) : 'Shadowsocks',
-          alive: o['alive'] === true,
+          alive: o['alive'] !== false,
           history,
           source: src,
           udp: o['udp'] === true,
@@ -482,13 +505,21 @@ export class VergeBridge {
         records[name] = node
       }
       const groups: Array<ProxyGroupViewView> = new Array<ProxyGroupViewView>()
-      for (const g of rawGroups) {
-        const o = g as Record<string, Object>
+      let globalGroup: ProxyGroupViewView | null = null
+      for (const e of entries) {
+        const o = e as Record<string, Object>
         const name = o['name'] as string
-        const all: Array<Object> = Array.isArray(o['all']) ? (o['all'] as Array<Object>) : new Array<Object>()
+        if (!Array.isArray(o['all'])) continue
+        const all: Array<Object> = o['all'] as Array<Object>
         const members: Array<MemberRefView> = new Array<MemberRefView>()
         for (const n of all) {
-          const ref: MemberRefView = { kind: 'node', name: n as string, recordId: n as string }
+          const memberName = n as string
+          const isGroup = groupNames[memberName] === true
+          const ref: MemberRefView = {
+            kind: isGroup ? 'group' : 'node',
+            name: memberName,
+            recordId: isGroup ? '' : memberName,
+          }
           members.push(ref)
         }
         const group: ProxyGroupViewView = {
@@ -505,16 +536,25 @@ export class VergeBridge {
           smux: false,
         }
         groups.push(group)
+        if (name === 'GLOBAL') globalGroup = group
+      }
+      const standalone: Array<string> = new Array<string>()
+      for (const e of entries) {
+        const o = e as Record<string, Object>
+        const name = o['name'] as string
+        if (groupNames[name] !== true && name !== 'DIRECT' && name !== 'REJECT') {
+          standalone.push(name)
+        }
       }
       const view: ProxyViewV1View = {
         schemaVersion: 1,
         orderSource: 'runtime',
         providerState: 'ready',
-        global: null,
-        direct: null,
+        global: globalGroup,
+        direct: records['DIRECT'] !== undefined ? records['DIRECT'] : null,
         groups,
         records,
-        standalone: new Array<string>(),
+        standalone,
         providers: new Array<Object>(),
       }
       return view
@@ -585,17 +625,38 @@ export class VergeBridge {
         this.resolve(id, true, this.readJsonFile(this.vergeConfigPath))
         return
       case 'patch_verge_config': {
-        const patch = args['config'] as Record<string, Object>
+        // The UI sends { payload: {...} }; older callers used { config: {...} }.
+        const raw = args['payload'] !== undefined ? args['payload'] : args['config']
+        const patch = raw as Record<string, Object>
         const store = this.readJsonFile(this.vergeConfigPath)
         if (patch !== undefined) {
           for (const k of Object.keys(patch)) store[k] = patch[k]
         }
         this.writeJsonFile(this.vergeConfigPath, store)
+        // The desktop backend applies these switches as side effects; without
+        // them the UI flips a toggle while the core never starts.
+        if (patch !== undefined && patch['enable_system_proxy'] !== undefined) {
+          if (patch['enable_system_proxy'] === true) {
+            this.startCore()
+          } else if (store['enable_tun_mode'] !== true) {
+            this.stopCore()
+          }
+        }
+        if (patch !== undefined && patch['enable_tun_mode'] !== undefined) {
+          if (patch['enable_tun_mode'] === true) {
+            this.startVpn()
+          } else {
+            this.stopVpn()
+          }
+        }
         this.emit('verge://refresh-verge-config', '')
         this.resolve(id, true, null)
         return
       }
       case 'get_profiles': {
+        // The UI asks for profiles right after load; resume the core here so a
+        // failed startup attempt still gets one retry once the page is alive.
+        this.ensureCore()
         const store = this.readProfilesStore()
         const cur = store['current']
         const current = typeof cur === 'string' && cur.length > 0 ? cur : null
@@ -604,8 +665,19 @@ export class VergeBridge {
         return
       }
       case 'patch_profiles_config': {
-        const profiles = args['profiles'] as Record<string, Object>
-        if (profiles !== undefined) this.saveProfilesStore(profiles)
+        const patch = args['profiles'] as Record<string, Object>
+        if (patch !== undefined) {
+          // The UI patches one field at a time (e.g. only `current` when a
+          // profile is activated), so merge into the stored config instead of
+          // replacing it — replacing would drop the imported items.
+          const store = this.readProfilesStore()
+          const previous = store['current']
+          for (const k of Object.keys(patch)) store[k] = patch[k]
+          this.saveProfilesStore(store)
+          if (patch['current'] !== undefined && patch['current'] !== previous) {
+            this.restartCore()
+          }
+        }
         this.emit('verge://refresh-profiles', '')
         const outcome: ValidationView = { status: 'valid', errors: new Array<Object>() }
         this.resolve(id, true, outcome)
@@ -620,7 +692,9 @@ export class VergeBridge {
             this.writeTextFile(this.profilePath(uid), String(fileData))
           }
           const store = this.readProfilesStore()
-          this.items(store).push(item)
+          const items = this.items(store)
+          items.push(item)
+          store['items'] = items
           this.saveProfilesStore(store)
         }
         this.emit('verge://refresh-profiles', '')
@@ -645,9 +719,23 @@ export class VergeBridge {
             url,
             updated: Math.floor(Date.now() / 1000),
           }
-          this.items(store).push(item)
+          const items = this.items(store)
+          items.push(item)
+          // items() hands back a fresh array when the store has none yet, so it
+          // must be written back before saving.
+          store['items'] = items
+          // First import becomes the active profile, so the core has something
+          // to load without an extra tap.
+          const current = store['current']
+          const autoActivated = typeof current !== 'string' || current.length === 0
+          if (autoActivated) store['current'] = uid
           this.saveProfilesStore(store)
+          hilog.info(DOMAIN, TAG, 'import_profile saved items=%{public}d', items.length)
           this.emit('verge://refresh-profiles', '')
+          if (autoActivated) {
+            this.emit('verge://refresh-clash-config', '')
+            this.startCore()
+          }
         })
         return
       }
@@ -820,9 +908,10 @@ export class VergeBridge {
         return
       }
       case 'get_sys_proxy': {
+        const cfg = this.readJsonFile(this.vergeConfigPath)
         const sp: Record<string, Object> = {}
-        sp['enable'] = false
-        sp['server'] = ''
+        sp['enable'] = cfg['enable_system_proxy'] === true
+        sp['server'] = `127.0.0.1:${DEFAULT_MIXED_PORT}`
         sp['bypass'] = ''
         this.resolve(id, true, sp)
         return
@@ -929,6 +1018,12 @@ export class VergeBridge {
       hilog.info(DOMAIN, TAG, 'startVpnExtensionAbility ok')
     }).catch((e: BusinessError) => {
       hilog.error(DOMAIN, TAG, 'start failed: %{public}s', e.message)
+      // The extension did not start (permission denied, no VPN dialog on this
+      // image, ...): revert the toggle so the UI does not claim TUN is on.
+      const store = this.readJsonFile(this.vergeConfigPath)
+      store['enable_tun_mode'] = false
+      this.writeJsonFile(this.vergeConfigPath, store)
+      this.emit('verge://refresh-verge-config', '')
       this.emit('verge://notice-message', ['error', `VPN start failed: ${e.message}`])
     })
   }
@@ -968,8 +1063,10 @@ export class VergeBridge {
 
   private urlName(url: string): string {
     try {
-      const u = url.replace(/\/+$/, '')
-      const last = u.split('/').pop()
+      // Drop query/fragment and trailing slashes so the card shows a stable
+      // name instead of "<id>?token=…".
+      const clean = url.split('#')[0].split('?')[0].replace(/\/+$/, '')
+      const last = clean.split('/').pop()
       return last !== undefined && last.length > 0 ? last : url
     } catch (e) {
       return url

@@ -42,10 +42,17 @@ struct Index {
     try {
       const v = bridge.bridgeVersion()
       const p = bridge.ping()
-      const st = bridge.coreStatus()
-      this.bridgeInfo = `bridge=${v} ping=${p} coreStatus=${st}`
       const ctx = getContext(this) as common.UIAbilityContext
       this.vb = new VergeBridge(this.controller, ctx)
+      // Resume the core if a profile was active when the app was last closed.
+      // A native hiccup here must not blank out the bridge status line.
+      try {
+        this.vb.ensureCore()
+      } catch (e) {
+        hilog.warn(DOMAIN, 'Index', 'ensureCore failed: %{public}s', JSON.stringify(e))
+      }
+      const st = bridge.coreIsRunningEmbedded()
+      this.bridgeInfo = `bridge=${v} ping=${p} core=${st > 0 ? 'running' : 'stopped'}`
       setInterval(() => {
         if (this.vb !== null && this.vb.coreDesired && !this.vb.coreRunning()) {
           hilog.warn(DOMAIN, 'Index', 'core died; restarting')

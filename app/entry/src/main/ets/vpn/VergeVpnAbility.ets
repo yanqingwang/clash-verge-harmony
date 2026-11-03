@@ -65,21 +65,6 @@ export default class VergeVpnAbility extends VpnExtensionAbility {
     }
   }
 
-  private resolveCoreBinPath(): string {
-    const candidates: string[] = [
-      `${this.context.bundleCodeDir}/libs/arm64/libverge_mihomo.so`,
-      `${this.context.bundleCodeDir}/libs/arm64-v8a/libverge_mihomo.so`,
-    ]
-    for (const p of candidates) {
-      try {
-        if (fs.accessSync(p)) return p
-      } catch (e) {
-        // keep probing
-      }
-    }
-    return candidates[0]
-  }
-
   /** Remove a previously appended top-level `tun:` block (end of file). */
   private stripTunBlock(yaml: string): string {
     const lines = yaml.split('\n')
@@ -144,7 +129,9 @@ export default class VergeVpnAbility extends VpnExtensionAbility {
       '  auto-route: false',
     ].join('\n')
     this.writeText(runtimePath, yaml)
-    return bridge.coreStart(this.resolveCoreBinPath(), coreDir, runtimePath)
+    // In-process core (c-shared libverge_mihomo.so); HarmonyOS denies
+    // execve of app-owned files, so this extension process hosts it.
+    return bridge.coreStartEmbedded(runtimePath, coreDir)
   }
 
   async onCreate(want: Want): Promise<void> {
@@ -181,9 +168,9 @@ export default class VergeVpnAbility extends VpnExtensionAbility {
         isBlocking: false,
         blockedApplications: [BUNDLE_NAME],
       })
-      const pid = this.startCoreWithTun(fd)
-      if (pid <= 0) {
-        const msg = `coreStart failed rc=${pid}`
+      const rc = this.startCoreWithTun(fd)
+      if (rc !== 0) {
+        const msg = `coreStartEmbedded failed rc=${rc}`
         this.writeStatus(`failed:${msg}`)
         try {
           await this.vpnConnection.destroy()
@@ -194,7 +181,7 @@ export default class VergeVpnAbility extends VpnExtensionAbility {
         throw new Error(msg)
       }
       this.writeStatus('started')
-      hilog.info(0x0666, TAG, 'vpn', 'started fd=%{public}d pid=%{public}d', fd, pid)
+      hilog.info(0x0666, TAG, 'vpn', 'started fd=%{public}d', fd)
 
       // Supervisor: auto-restart the core if it dies while the VPN is up.
       const self = this
@@ -208,10 +195,10 @@ export default class VergeVpnAbility extends VpnExtensionAbility {
           return
         }
         try {
-          if (bridge.coreStatus() <= 0) {
+          if (bridge.coreIsRunningEmbedded() <= 0) {
             hilog.warn(0x0666, TAG, 'vpn', 'core died; restarting with fd=%{public}d', fd)
-            const rp = self.startCoreWithTun(fd)
-            if (rp <= 0) self.writeStatus(`failed:restart rc=${rp}`)
+            const rr = self.startCoreWithTun(fd)
+            if (rr !== 0) self.writeStatus(`failed:restart rc=${rr}`)
           }
         } catch (e) {
           hilog.warn(0x0666, TAG, 'vpn', 'supervisor error: %{public}s', JSON.stringify(e))
@@ -229,7 +216,7 @@ export default class VergeVpnAbility extends VpnExtensionAbility {
     this.supervisorToken += 1
     const errors: string[] = []
     try {
-      bridge.coreStop()
+      bridge.coreStopEmbedded()
     } catch (e) {
       errors.push(`coreStop: ${JSON.stringify(e)}`)
     }

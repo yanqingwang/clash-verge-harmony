@@ -2,8 +2,8 @@
   "app": {
     "bundleName": "io.github.clashverge.harmony",
     "vendor": "clash-verge-rev",
-    "versionCode": 1000001,
-    "versionName": "0.2.0",
+    "versionCode": 1000002,
+    "versionName": "0.3.0",
     "icon": "$media:app_icon",
     "label": "$string:app_name",
     "maxChildProcess": 8

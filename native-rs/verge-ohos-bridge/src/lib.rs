@@ -96,7 +96,10 @@ pub extern "C" fn verge_core_start(
             }
             0
         },
-        Err(_) => -1,
+        Err(e) => {
+            set_last_error(&e);
+            -1
+        }
     }
 }
 
@@ -132,7 +135,10 @@ pub unsafe extern "C" fn verge_core_rest_get(
     };
     let body = match core::rest_get(&p) {
         Ok(b) => b,
-        Err(_) => return -1,
+        Err(e) => {
+            set_last_error(&format!("rest_get {p}: {e}"));
+            return -1;
+        }
     };
     let n = body.len();
     if out_buf.is_null() || cap <= n {

@@ -15,8 +15,12 @@ cd "$ROOT/app"
 [ -f oh-package-lock.json5 ] || ohpm install
 
 # stage prebuilt native libs (must be named lib*.so for HAP extraction)
+if [ ! -f "$ROOT/out/libverge_mihomo-ohos-arm64.so" ]; then
+  echo "missing out/libverge_mihomo-ohos-arm64.so — run scripts/build-core-embedded.sh first" >&2
+  exit 1
+fi
 mkdir -p entry/libs/arm64 entry/libs/arm64-v8a
-cp "$ROOT/out/verge-mihomo-ohos-arm64" entry/libs/arm64/libverge_mihomo.so
+cp "$ROOT/out/libverge_mihomo-ohos-arm64.so" entry/libs/arm64/libverge_mihomo.so
 cp "$ROOT/native-rs/verge-ohos-bridge/target/aarch64-unknown-linux-ohos/release/libverge_ohos_bridge.so" \
    entry/libs/arm64/libverge_ohos_bridge.so
 cp entry/libs/arm64/libverge_mihomo.so entry/libs/arm64-v8a/

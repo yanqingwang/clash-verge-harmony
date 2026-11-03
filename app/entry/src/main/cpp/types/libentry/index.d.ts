@@ -8,3 +8,6 @@ export const coreWaitReady: (timeoutMs: number) => number
 export const coreRestGet: (path: string) => string
 export const subscriptionFetch: (url: string, outPath: string) => number
 export const lastError: () => string
+export const coreStartEmbedded: (configPath: string, homeDir: string) => number
+export const coreStopEmbedded: () => number
+export const coreIsRunningEmbedded: () => number

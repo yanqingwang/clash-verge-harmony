@@ -4,6 +4,7 @@
 // model FlClash-HarmonyOS uses for its core.
 #include "napi/native_api.h"
 #include <dlfcn.h>
+#include <hilog/log.h>
 #include <string>
 
 // --- resolved symbol types (mirror the Rust C ABI) ---
@@ -18,6 +19,11 @@ typedef int (*fn_core_wait_ready)(unsigned long long);
 typedef long long (*fn_core_rest_get)(const char *, char *, unsigned long);
 typedef long long (*fn_subscription_fetch)(const char *, const char *);
 typedef const char *(*fn_last_error)(void);
+// In-process mihomo (HarmonyOS denies execve on app files, so the core is a
+// c-shared library loaded here instead of a sidecar child process).
+typedef int (*fn_core_start_embedded)(const char *, const char *);
+typedef int (*fn_core_stop_embedded)(void);
+typedef int (*fn_core_is_running_embedded)(void);
 }
 
 static void *g_bridge = nullptr;
@@ -31,6 +37,44 @@ static fn_core_wait_ready g_core_wait_ready = nullptr;
 static fn_core_rest_get g_core_rest_get = nullptr;
 static fn_subscription_fetch g_subscription_fetch = nullptr;
 static fn_last_error g_last_error = nullptr;
+
+static void *g_core = nullptr;
+static fn_core_start_embedded g_core_start_embedded = nullptr;
+static fn_core_stop_embedded g_core_stop_embedded = nullptr;
+static fn_core_is_running_embedded g_core_is_running_embedded = nullptr;
+
+// libverge_mihomo.so is the mihomo Go core built with -buildmode=c-shared
+// (see native/ohos-core/main.go). It ships in libs/arm64 and is resolved by
+// soname.
+static bool ensure_core() {
+  if (g_core && g_core_start_embedded && g_core_stop_embedded &&
+      g_core_is_running_embedded) {
+    return true;
+  }
+  if (g_core) {
+    dlclose(g_core);
+    g_core = nullptr;
+    g_core_start_embedded = nullptr;
+    g_core_stop_embedded = nullptr;
+    g_core_is_running_embedded = nullptr;
+  }
+  g_core = dlopen("libverge_mihomo.so", RTLD_NOW | RTLD_LOCAL);
+  if (!g_core)
+    return false;
+  g_core_start_embedded =
+      (fn_core_start_embedded)dlsym(g_core, "verge_core_start_embedded");
+  g_core_stop_embedded =
+      (fn_core_stop_embedded)dlsym(g_core, "verge_core_stop_embedded");
+  g_core_is_running_embedded =
+      (fn_core_is_running_embedded)dlsym(g_core, "verge_core_is_running_embedded");
+  if (!g_core_start_embedded || !g_core_stop_embedded ||
+      !g_core_is_running_embedded) {
+    dlclose(g_core);
+    g_core = nullptr;
+    return false;
+  }
+  return true;
+}
 
 static bool bridge_ready() {
   return g_ping && g_version && g_config_generate && g_core_start &&
@@ -202,6 +246,39 @@ static napi_value JsSubscriptionFetch(napi_env env, napi_callback_info info) {
   return out;
 }
 
+static napi_value JsCoreStartEmbedded(napi_env env, napi_callback_info info) {
+  size_t argc = 2;
+  napi_value argv[2];
+  napi_get_cb_info(env, info, &argc, argv, nullptr, nullptr);
+  std::string cfg = GetStringArg(env, argc, argv, 0);
+  std::string home = GetStringArg(env, argc, argv, 1);
+  napi_value out;
+  int rc = -2; // library load failure
+  if (ensure_core()) {
+    rc = g_core_start_embedded(cfg.c_str(), home.c_str());
+  } else {
+    const char *dl = dlerror();
+    OH_LOG_Print(LOG_APP, LOG_ERROR, 0x0666, "VergeNAPI",
+                 "libverge_mihomo.so load failed: %{public}s",
+                 dl ? dl : "(no dlerror)");
+  }
+  napi_create_int32(env, rc, &out);
+  return out;
+}
+
+static napi_value JsCoreStopEmbedded(napi_env env, napi_callback_info) {
+  napi_value out;
+  napi_create_int32(env, ensure_core() ? g_core_stop_embedded() : -1, &out);
+  return out;
+}
+
+static napi_value JsCoreIsRunningEmbedded(napi_env env, napi_callback_info) {
+  napi_value out;
+  napi_create_int32(env,
+                    ensure_core() ? g_core_is_running_embedded() : 0, &out);
+  return out;
+}
+
 static napi_value JsLastError(napi_env env, napi_callback_info) {
   // Distinguish a real operation error from "the bridge itself is missing".
   // The old code collapsed both into "bridge not loadable", which hid the
@@ -240,6 +317,12 @@ static napi_value Init(napi_env env, napi_value exports) {
        nullptr, napi_default, nullptr},
       {"lastError", nullptr, JsLastError, nullptr, nullptr, nullptr,
        napi_default, nullptr},
+      {"coreStartEmbedded", nullptr, JsCoreStartEmbedded, nullptr, nullptr,
+       nullptr, napi_default, nullptr},
+      {"coreStopEmbedded", nullptr, JsCoreStopEmbedded, nullptr, nullptr,
+       nullptr, napi_default, nullptr},
+      {"coreIsRunningEmbedded", nullptr, JsCoreIsRunningEmbedded, nullptr,
+       nullptr, nullptr, napi_default, nullptr},
   };
   napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
   return exports;
