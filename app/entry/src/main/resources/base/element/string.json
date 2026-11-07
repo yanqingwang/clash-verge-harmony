@@ -1,9 +1,9 @@
 {
   "string": [
-    { "name": "module_desc", "value": "Clash Verge Rev HarmonyOS shell" },
+    { "name": "module_desc", "value": "Clash Verge Rev HarmonyOS main module" },
     { "name": "EntryAbility_desc", "value": "Clash Verge main ability" },
     { "name": "EntryAbility_label", "value": "Clash Verge" },
-    { "name": "internet_permission_reason", "value": "Clash core needs network access to run the local proxy." },
-    { "name": "network_info_permission_reason", "value": "Reading network info is required to manage the VPN connection." }
+    { "name": "internet_permission_reason", "value": "Used to fetch subscription profiles, connect to proxy nodes and forward network traffic through the local proxy service; no personal data is collected or uploaded." },
+    { "name": "network_info_permission_reason", "value": "Used to read the current network state when enabling VPN so the system VPN connection can be created and managed correctly." }
   ]
 }

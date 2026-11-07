@@ -1,0 +1,9 @@
+{
+  "string": [
+    { "name": "module_desc", "value": "Clash Verge Rev 鸿蒙版主模块" },
+    { "name": "EntryAbility_desc", "value": "Clash Verge 主界面" },
+    { "name": "EntryAbility_label", "value": "Clash Verge" },
+    { "name": "internet_permission_reason", "value": "用于下载订阅配置、连接代理节点，并通过本地代理服务转发网络流量；不收集或上传用户个人信息。" },
+    { "name": "network_info_permission_reason", "value": "用于在开启 VPN 时读取当前网络状态，以便正确建立和管理系统 VPN 连接。" }
+  ]
+}

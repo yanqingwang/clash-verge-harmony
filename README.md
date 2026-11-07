@@ -52,6 +52,27 @@ scripts/build-hap.sh             # staging + app/ → entry-default-unsigned.hap
 前置：DevEco Studio 26.0.0.851（含 SDK API 26 / NDK / hvigor 6.26.8 / JBR）。
 签名：需为 `io.github.clashverge.harmony` 注册调试 profile（华为签名服务器要求大陆网络）；本机 `~/.ohos/config` 现有 profile 绑定的是 `com.heartroad.cardcounter`，不可复用。
 
+## 上架合规（AGC「鸿蒙生态规则检测」）
+
+上传 AGC 软件包时，合法性检测里的「**鸿蒙生态规则检测**」（描述为"检测上架分发的鸿蒙应用和元服务是否满足生态的规范性要求"）会静态扫描 APP 包。为满足其规范，本工程已按下表整改（2026-11-07）：
+
+| 检测规则 | 整改前 | 整改后 |
+|---|---|---|
+| **应用图标**：必须分前景/背景两层、各 1024×1024；禁止系统默认图标 | `app_icon.png` 216px 纯色方块 + `icon.png` 114px DevEco 蓝色四方格**默认模板图标**；`app.json5` 用单层 `$media:app_icon` | 新增 `layered_image.json` + `background.png`（实色不透明）/`foreground.png`（透明底 + V 形代理链路标志），均由 `scripts/gen_icons.py` 生成；`app.json5` 与 `module.json5` 的 EntryAbility `icon` 统一改 `$media:layered_image`；`icon.png`（`startWindowIcon`）与 `app_icon.png` 改为 1024×1024 合成图 |
+| **显示名称有意义**：中英文和默认语言都需有意义、非默认值 | 只有 `base/element/string.json`（英文） | 补 `zh_CN` / `en_US` / `base` 三套 `app_name`、Ability 标签与权限 reason |
+| **权限说明**：reason 需说明具体场景，不可写"为了功能正常使用" | 泛化英文描述 | 中英文改为具体场景（下载订阅、连接代理节点、建立系统 VPN），并声明不收集个人信息 |
+| **应用类型**：Stage 模型需 `bundleType: "app"`（缺省值即 app） | 未显式声明 | `app.json5` 显式加 `"bundleType": "app"` |
+| **子进程**：0.3.0 起核心已改进程内加载（`coreStartEmbedded`），不再 spawn | 残留 `maxChildProcess: 8` | 移除该残留字段（缺省即系统默认上限，行为不变） |
+
+图标资源如需重新生成（纯标准库，无第三方依赖）：
+
+```bash
+python3 scripts/gen_icons.py app
+```
+
+> 注意：AGC 报告里「鸿蒙生态规则检测」是一个**检查项名称**，其"修改意见/详情"会列出具体违规子项。若重新上传后仍不通过，请以报告「详情」中的原文为准，对应到上表规则；常见还有「应用未配置图标的前景图和后景图」「应用名称/图标与系统默认相同」「非预期文件打包检测」等。
+> 另：修改代码后需重新打 release 签名的 `.app` 并重新上传；若 AGC 提示版本号已存在，递增 `AppScope/app.json5` 的 `versionCode`。
+
 ## 工程结构
 
 ```
@@ -65,7 +86,7 @@ out/              构建产物
 
 ## 路线图（方案 B，见报告第 6 节）
 
-- **P1**：Rust 后端去桌面化移植进 `verge-ohos-bridge`（配置生成/订阅/核心管理），mihomo 以 HAP 内 `libs/arm64` 打包 + 运行时解包执行（`maxChildProcess: 8` 已声明）。
+- **P1**：Rust 后端去桌面化移植进 `verge-ohos-bridge`（配置生成/订阅/核心管理）；mihomo 最初以 HAP 内 `libs/arm64` 打包 + 运行时解包执行，0.3.0 起改为 **c-shared 进程内加载**（鸿蒙禁止对应用私有文件 `execve`），详见 `wk/notes/clash-verge-harmony-适配经验-返回键后台与订阅-2026-11-03.md`。
 - **P2**：ArkWeb 加载 Verge React 构建产物，`contract.ts` 层 shim `invoke/listen` → ArkTS/JSBridge。
 - **P3**：VpnExtensionAbility（TUN→mihomo）+ 长时任务保活；分应用代理受 `CONNECTIVITY_INTERNAL` 系统权限限制（平台约束，明确降级）。
 - **P4**：注册 profile → 签名 → 真机（DevEco Testing 云真机可先行）。
